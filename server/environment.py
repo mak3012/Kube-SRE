@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from openenv.core.env_server.interfaces import Environment
 from pydantic import BaseModel
 
-from models import ClusterTelemetry, EventSnippet, KubeSREObservation, KubeToolAction, PodStatus, ToolName
+from .models import ClusterTelemetry, EventSnippet, KubeSREObservation, KubeToolAction, PodStatus, ToolName
 
 
 def _now() -> float:
