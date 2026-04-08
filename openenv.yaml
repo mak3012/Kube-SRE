@@ -1,7 +1,7 @@
 name: kube-sre-gym
 spec_version: 1
 runtime:
-  entrypoint: app:app
+  entrypoint: server.app:app
   factory: create_app
 transport:
   type: websocket
