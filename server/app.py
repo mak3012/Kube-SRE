@@ -6,8 +6,8 @@ import uvicorn
 from openenv.core.env_server import create_fastapi_app
 from fastapi.responses import HTMLResponse
 
-from environment import KubeSREGymEnv
-from models import KubeSREObservation, KubeToolAction
+from .environment import KubeSREGymEnv
+from .models import KubeSREObservation, KubeToolAction
 
 
 APP_NAME = "kube-sre-gym"
