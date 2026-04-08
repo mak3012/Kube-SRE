@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kube-sre-gym"
+version = "0.1.0"
+description = "OpenEnv Kubernetes SRE Simulator"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.7.0",
+    "PyYAML>=6.0.1",
+    "websockets>=12.0",
+    "openai>=1.40.0",
+    "openenv-core>=0.2.3"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
