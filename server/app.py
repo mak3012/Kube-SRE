@@ -68,5 +68,5 @@ if __name__ == "__main__":
     # In Docker/Spaces, set HOST=0.0.0.0 explicitly.
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8001"))
-    uvicorn.run("app:app", host=host, port=port, log_level="info")
+    uvicorn.run("server.app:app", host=host, port=port, log_level="info")
 
