@@ -6,6 +6,7 @@ import uvicorn
 from openenv.core.env_server import create_fastapi_app
 from fastapi.responses import HTMLResponse
 
+# Note: The dots represent relative imports within the 'server' package
 from .environment import KubeSREGymEnv
 from .models import KubeSREObservation, KubeToolAction
 
@@ -59,14 +60,22 @@ ws://127.0.0.1:8001/ws</pre>
     return app
 
 
-# Hackathon runner commonly imports `app`
+# The global app object for the runner
 app = create_app()
 
 
-if __name__ == "__main__":
-    # For local dev, default to localhost to avoid users trying to browse 0.0.0.0.
-    # In Docker/Spaces, set HOST=0.0.0.0 explicitly.
+def main():
+    """
+    The entry point called by the 'server' script in pyproject.toml 
+    and the Docker CMD runner.
+    """
+    # Use 0.0.0.0 for Docker/HuggingFace, default to 127.0.0.1 for local dev
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8001"))
+    
+    # CRITICAL: The string path must be "server.app:app" to work as a package
     uvicorn.run("server.app:app", host=host, port=port, log_level="info")
 
+
+if __name__ == "__main__":
+    main()
