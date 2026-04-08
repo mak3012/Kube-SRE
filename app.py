@@ -64,9 +64,9 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    # For local dev, default to localhost to avoid users trying to browse 0.0.0.0.
-    # In Docker/Spaces, set HOST=0.0.0.0 explicitly.
-    host = os.environ.get("HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", "8001"))
+    # Hugging Face provides PORT=8000 via the Dockerfile ENV
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    
+    # Use 0.0.0.0 for deployment, 127.0.0.1 for local testing
     uvicorn.run("app:app", host=host, port=port, log_level="info")
-
