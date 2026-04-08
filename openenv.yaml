@@ -1,0 +1,21 @@
+name: kube-sre-gym
+spec_version: 1
+runtime:
+  entrypoint: app:app
+  factory: create_app
+transport:
+  type: websocket
+  ws_path: /ws
+tasks:
+  - id: ghost_image
+    name: The Ghost Image
+    difficulty: easy
+  - id: memory_leak
+    name: The Memory Leak
+    difficulty: medium
+  - id: cascading_mesh_failure
+    name: Cascading Mesh Failure
+    difficulty: hard
+limits:
+  vcpus: 2
+  ram_gb: 8
