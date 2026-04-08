@@ -3,10 +3,10 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    HOST=0.0.0.0 \
+ENV HOST=0.0.0.0 \
     PORT=8000
+
+EXPOSE 8000
 
 # Copy requirements and install them
 COPY requirements.txt /app/requirements.txt
