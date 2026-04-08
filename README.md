@@ -1,13 +1,18 @@
 ---
+title: Kube SRE Gym
+emoji: 🐳
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
 tags:
   - openenv
 ---
 
 # Kube-SRE-Gym
-
 Kube-SRE-Gym is a **production-incident RL environment** for diagnosing and resolving Kubernetes outages using **typed, safe `kubectl` actions** and **structured telemetry observations**. It is **OpenEnv** compatible and served over **WebSockets** at `/ws`.
 
-## What you get
+
 
 - **Curriculum of incident scenarios**
   - **Easy**: *The Ghost Image* — `ImagePullBackOff` caused by a typo image tag
