@@ -22,4 +22,4 @@ RUN useradd -m -u 1000 appuser
 USER 1000:1000
 
 # Start the server
-CMD ["python", "app.py"]
+CMD ["python", "-m", "server.app"]
