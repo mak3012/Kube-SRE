@@ -402,14 +402,15 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
     def _is_failure(self) -> bool:
         return _now() - self._episode_start > 60 * 15
 
-    def _score(self) -> float:
+   def _score(self) -> float:
         if self._is_success():
-            return 1.0
+            return 0.99  # Changed from 1.0 to satisfy strict (0, 1) bounds
         if self.done and self._is_failure():
-            return 0.0
-        score = 0.0
+            return 0.01  # Changed from 0.0 to satisfy strict (0, 1) bounds
+        
+        score = 0.01     # Base score instead of 0.0
         if self._identified_error:
-            score = max(score, 0.5)
+            score = max(score, 0.50)
         if self._attempted_fix:
             score = max(score, 0.75)
         return score
