@@ -77,6 +77,10 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
     """
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
+    # Score bounds — strictly within (0, 1), never equal to 0.0 or 1.0
+    _SCORE_MIN: float = 0.01
+    _SCORE_MAX: float = 0.99
+
     def __init__(self, seed: Optional[int] = None):
         super().__init__()
         self._rng = random.Random(seed)
@@ -177,9 +181,12 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
 
     # ---- THE PERMANENT FOOLPROOF CLAMP ----
     def _get_safe_score(self) -> float:
-        """Mathematically enforces the strictly (0, 1) rule under all conditions."""
+        """
+        Mathematically enforces the strictly (0, 1) rule under all conditions.
+        No raw score value anywhere in this class should ever bypass this method.
+        """
         raw_score = self._score()
-        return max(0.01, min(0.99, float(raw_score)))
+        return max(self._SCORE_MIN, min(self._SCORE_MAX, float(raw_score)))
 
     @property
     def state(self) -> Dict[str, Any]:
@@ -321,7 +328,10 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         return 1.0
 
     def _potential(self) -> float:
-        return 1.0 - self._error_distance()
+        # Clamp to strictly (0, 1) so reward shaping never produces
+        # a phi value of exactly 0.0 or 1.0 that could leak into score.
+        raw = 1.0 - self._error_distance()
+        return max(self._SCORE_MIN, min(self._SCORE_MAX, raw))
 
     def _is_success(self) -> bool:
         return self._error_distance() <= 1e-9
@@ -330,16 +340,20 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         return _now() - self._episode_start > 60 * 15
 
     def _score(self) -> float:
+        """
+        Returns a raw score. All values are already within [0.01, 0.99].
+        _get_safe_score() applies a final clamp before any value leaves this class.
+        """
         if self._is_success():
-            return 0.99
+            return 0.99   # strictly < 1.0  ✓
         if self.done and self._is_failure():
-            return 0.01
+            return 0.01   # strictly > 0.0  ✓
         score = 0.01
         if self._identified_error:
             score = max(score, 0.50)
         if self._attempted_fix:
             score = max(score, 0.75)
-        return score
+        return score  # 0.01 | 0.50 | 0.75 — all strictly within (0, 1)  ✓
 
     def _update_grader_signals(self, tool: str, out: Any) -> None:
         s = ""
@@ -411,7 +425,7 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
             step=self.step_n,
             done=self.done,
             reward=float(self.reward),
-            score=self._get_safe_score(),
+            score=self._get_safe_score(),   # always strictly (0, 1)
             text=text,
             telemetry=self._telemetry(),
             metadata={"episode_id": self.episode_id},
