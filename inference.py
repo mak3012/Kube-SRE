@@ -83,7 +83,7 @@ async def solve_task(task_id: str):
                     state = step_data.get("observation", step_data)
                     is_done = step_data.get("done", False)
                     
-                    # Extract score safely to avoid absolute 0.0 or 1.0
+                    # Extract score safely
                     if isinstance(state, dict):
                         score = float(state.get("score", 0.01))
                     else:
@@ -107,8 +107,10 @@ async def solve_task(task_id: str):
         except Exception as e:
             print(f"[STEP] Unhandled error during setup: {e}")
             
-    # Always emit [END] safely within (0, 1) bounds
-    print(f"[END] {task_id} {score}")
+    # --- ULTIMATE SAFETY CLAMP ---
+    # Guarantees the score is mathematically locked between 0.01 and 0.99
+    final_score = max(0.01, min(0.99, score))
+    print(f"[END] {task_id} {final_score}")
 
 async def main():
     print("Waiting for OpenEnv server to boot...")
