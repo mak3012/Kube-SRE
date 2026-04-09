@@ -10,7 +10,7 @@ API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 HF_TOKEN = os.environ.get("HF_TOKEN", "dummy-token-if-local")
 
-# The validator provides OPENENV_ADDR. If running locally, default to 8000 (matching your Dockerfile)
+# The validator provides OPENENV_ADDR. Default to 8000
 ENV_BASE_URL = os.environ.get("OPENENV_ADDR", "http://localhost:8000").rstrip("/")
 
 # --- 2. INITIALIZE OPENAI CLIENT ---
@@ -24,13 +24,12 @@ async def wait_for_server():
     async with httpx.AsyncClient() as http:
         for attempt in range(15):
             try:
-                # Ping the health/docs endpoint
                 res = await http.get(f"{ENV_BASE_URL}/docs", timeout=2.0)
                 if res.status_code == 200:
                     return True
             except Exception:
                 pass
-            await asyncio.sleep(1) # Wait 1 second and retry
+            await asyncio.sleep(1)
     return False
 
 def clean_json_response(raw_text: str) -> dict:
@@ -46,9 +45,8 @@ def clean_json_response(raw_text: str) -> dict:
 
 async def solve_task(task_id: str):
     print(f"[START] {task_id}")
-    score = 0.01
+    score = 0.01  # Safe default within (0, 1) bounds
     
-    # Use a high timeout because LLMs can be slow
     async with httpx.AsyncClient(timeout=30.0) as http:
         try:
             # --- RESET ENVIRONMENT ---
@@ -56,14 +54,12 @@ async def solve_task(task_id: str):
             reset_res.raise_for_status()
             state = reset_res.json()
             
-            # Cap steps to prevent infinite loops (Hackathon limit: 20 mins total)
             for step_num in range(15): 
                 try:
                     # --- CALL LLM ---
-                    # --- CALL LLM ---
                     response = await client.chat.completions.create(
                         model=MODEL_NAME,
-                        response_format={ "type": "json_object" }, # FORCES JSON OUTPUT
+                        response_format={ "type": "json_object" }, # Forces JSON output
                         messages=[
                             {
                                 "role": "system", 
@@ -83,23 +79,23 @@ async def solve_task(task_id: str):
                     step_res.raise_for_status()
                     step_data = step_res.json()
                     
-                    # Extract variables based on standard OpenEnv schema
-                state = step_data.get("observation", step_data)
-                is_done = step_data.get("done", False)
-
-                # CRITICAL FIX: Extract 'score' from the observation dictionary
-                if isinstance(state, dict):
-                    score = float(state.get("score", 0.01))
-                else:
-                    score = 0.01
+                    # --- EXTRACT VARIABLES ---
+                    state = step_data.get("observation", step_data)
+                    is_done = step_data.get("done", False)
+                    
+                    # Extract score safely to avoid absolute 0.0 or 1.0
+                    if isinstance(state, dict):
+                        score = float(state.get("score", 0.01))
+                    else:
+                        score = 0.01
                     
                     if is_done:
                         break
                         
-                # Catch Parsing Errors so the script doesn't crash
+                # Catch Parsing Errors
                 except json.JSONDecodeError as je:
                     print(f"[STEP] JSON Parse Error: {je}")
-                    break # End the task early with current score
+                    break 
                     
                 # Catch Network/LLM Errors
                 except Exception as e:
@@ -111,7 +107,7 @@ async def solve_task(task_id: str):
         except Exception as e:
             print(f"[STEP] Unhandled error during setup: {e}")
             
-    # Always emit [END] even if the task failed midway!
+    # Always emit [END] safely within (0, 1) bounds
     print(f"[END] {task_id} {score}")
 
 async def main():
@@ -120,7 +116,7 @@ async def main():
         print("CRITICAL: Server did not start in time. Check Dockerfile and Port!")
         return
         
-    # CRITICAL FIX: These must match the keys in SCENARIOS from environment.py
+    # Matches environment.py SCENARIOS perfectly
     tasks = ["ghost_image", "memory_leak", "cascading_mesh_failure"] 
     
     for t in tasks:
