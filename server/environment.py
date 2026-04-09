@@ -11,10 +11,8 @@ from pydantic import BaseModel
 
 from .models import ClusterTelemetry, EventSnippet, KubeSREObservation, KubeToolAction, PodStatus, ToolName
 
-
 def _now() -> float:
     return time.time()
-
 
 @dataclass
 class _Pod:
@@ -31,7 +29,6 @@ class _Pod:
     mem_request_mib: int = 128
     mem_usage_mib: int = 64
 
-
 @dataclass
 class _Deployment:
     name: str
@@ -40,7 +37,6 @@ class _Deployment:
     mem_limit_mib: int = 256
     mem_request_mib: int = 128
 
-
 @dataclass
 class _VirtualService:
     name: str
@@ -48,13 +44,11 @@ class _VirtualService:
     host: str
     route_ok: bool = True
 
-
 class ScenarioSpec(BaseModel):
     id: str
     title: str
     difficulty: str
     description: str
-
 
 SCENARIOS: Dict[str, ScenarioSpec] = {
     "ghost_image": ScenarioSpec(
@@ -77,33 +71,24 @@ SCENARIOS: Dict[str, ScenarioSpec] = {
     ),
 }
 
-
 class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, Any]]):
     """
     openenv-core Environment that simulates Kubernetes incidents.
-
-    Public methods are exposed as callable tools (docstrings required).
     """
-
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
     def __init__(self, seed: Optional[int] = None):
         super().__init__()
         self._rng = random.Random(seed)
-
         self.task_id: str = "ghost_image"
         self.episode_id: Optional[str] = None
         self.step_n: int = 0
-
-        # GRPO expects these stored on env instances
         self.reward: float = 0.0
         self.done: bool = False
-
         self._pods: Dict[Tuple[str, str], _Pod] = {}
         self._deployments: Dict[Tuple[str, str], _Deployment] = {}
         self._virtualservices: Dict[Tuple[str, str], _VirtualService] = {}
         self._events: List[EventSnippet] = []
-
         self._seen_log_success: bool = False
         self._last_error_distance: float = 1.0
         self._identified_error: bool = False
@@ -115,11 +100,9 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         if seed is not None:
             self._rng.seed(seed)
         self.episode_id = episode_id
-
         self.task_id = str(kwargs.get("task_id") or kwargs.get("scenario_id") or self.task_id)
         if self.task_id not in SCENARIOS:
             self.task_id = "ghost_image"
-
         self.step_n = 0
         self.reward = 0.0
         self.done = False
@@ -128,12 +111,10 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         self._last_error_distance = 1.0
         self._identified_error = False
         self._attempted_fix = False
-
         self._pods.clear()
         self._deployments.clear()
         self._virtualservices.clear()
         self._events.clear()
-
         self._bootstrap()
         self._inject_fault()
         return self._obs(text=self._render())
@@ -141,14 +122,11 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
     def step(self, action: KubeToolAction, timeout_s: Optional[float] = None, **kwargs: Any) -> KubeSREObservation:
         if self.done:
             return self._obs(text=self._render(extra="Episode already done; call reset()."))
-
         self.step_n += 1
         self.reward = -0.05
-
         ok = True
         err: Optional[str] = None
         out: Any = None
-
         try:
             a = action.args
             if action.tool == ToolName.get_pods:
@@ -172,9 +150,7 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
 
         if not ok:
             self.reward += -0.2
-
         self._update_grader_signals(tool=action.tool.value, out=out)
-
         gamma = 0.99
         phi_prev = self._potential()
         self._tick()
@@ -199,52 +175,27 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
 
         return self._obs(text=self._render(tool_output=out, error=err))
 
+    # ---- THE PERMANENT FOOLPROOF CLAMP ----
+    def _get_safe_score(self) -> float:
+        """Mathematically enforces the strictly (0, 1) rule under all conditions."""
+        raw_score = self._score()
+        return max(0.01, min(0.99, float(raw_score)))
+
     @property
     def state(self) -> Dict[str, Any]:
-        return {"task_id": self.task_id, "step": self.step_n, "reward": self.reward, "done": self.done, "score": self._score()}
-
-    # -------------------------
-    # Tools (public methods)
-    # -------------------------
+        return {"task_id": self.task_id, "step": self.step_n, "reward": self.reward, "done": self.done, "score": self._get_safe_score()}
 
     def get_pods(self, namespace: str = "prod") -> Dict[str, Any]:
-        """List pods in a namespace.
-
-        Args:
-            namespace: Kubernetes namespace (default: "prod").
-
-        Returns:
-            Dict with an "items" list of pod objects.
-        """
         pods = [p for (ns, _), p in self._pods.items() if ns == namespace]
         return {"items": [self._pod_to_dict(p) for p in pods]}
 
     def describe_pod(self, name: str, namespace: str = "prod") -> Dict[str, Any]:
-        """Describe a pod and include recent events.
-
-        Args:
-            name: Pod name.
-            namespace: Kubernetes namespace (default: "prod").
-
-        Returns:
-            Dict with pod details and event snippets.
-        """
         p = self._pods.get((namespace, name))
         if not p:
             return {"error": "NotFound"}
         return {"pod": self._pod_to_dict(p), "events": [e.model_dump() for e in self._events[-10:]]}
 
     def logs(self, pod: str, namespace: str = "prod", tail_lines: int = 200) -> Dict[str, Any]:
-        """Fetch recent log lines from a pod.
-
-        Args:
-            pod: Pod name.
-            namespace: Kubernetes namespace (default: "prod").
-            tail_lines: Number of lines to return.
-
-        Returns:
-            Dict with {"lines":[...]} or {"error":"..."}.
-        """
         p = self._pods.get((namespace, pod))
         if not p:
             return {"error": "NotFound"}
@@ -253,16 +204,6 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         return {"pod": pod, "lines": p.logs[-tail_lines:]}
 
     def patch_deployment(self, name: str, patch: Dict[str, Any], namespace: str = "prod") -> Dict[str, Any]:
-        """Patch a deployment (image/resources).
-
-        Args:
-            name: Deployment name.
-            patch: Patch dict (supports image + memoryMiB requests/limits).
-            namespace: Kubernetes namespace (default: "prod").
-
-        Returns:
-            Dict with {"ok": True} or {"error":"NotFound"}.
-        """
         d = self._deployments.get((namespace, name))
         if not d:
             return {"error": "NotFound"}
@@ -283,16 +224,6 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         return {"ok": True}
 
     def patch_virtualservice(self, name: str, patch: Dict[str, Any], namespace: str = "prod") -> Dict[str, Any]:
-        """Patch a VirtualService to restore mesh connectivity.
-
-        Args:
-            name: VirtualService name.
-            patch: Patch dict (supports spec.routeOk boolean).
-            namespace: Kubernetes namespace (default: "prod").
-
-        Returns:
-            Dict with {"ok": True} or {"error":"NotFound"}.
-        """
         v = self._virtualservices.get((namespace, name))
         if not v:
             return {"error": "NotFound"}
@@ -302,10 +233,6 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
         self._attempted_fix = True
         self._events.append(EventSnippet(ts=_now(), involved_object=f"virtualservice/{name}", reason="Patched", message="VirtualService patched"))
         return {"ok": True}
-
-    # -------------------------
-    # Internals
-    # -------------------------
 
     def _bootstrap(self) -> None:
         ns = "prod"
@@ -402,13 +329,12 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
     def _is_failure(self) -> bool:
         return _now() - self._episode_start > 60 * 15
 
-   def _score(self) -> float:
+    def _score(self) -> float:
         if self._is_success():
-            return 0.99  # Changed from 1.0 to satisfy strict (0, 1) bounds
+            return 0.99
         if self.done and self._is_failure():
-            return 0.01  # Changed from 0.0 to satisfy strict (0, 1) bounds
-        
-        score = 0.01     # Base score instead of 0.0
+            return 0.01
+        score = 0.01
         if self._identified_error:
             score = max(score, 0.50)
         if self._attempted_fix:
@@ -462,7 +388,7 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
 
     def _render(self, tool_output: Any = None, error: Optional[str] = None, extra: Optional[str] = None) -> str:
         t = self._telemetry()
-        lines: List[str] = [f"task_id={t.scenario_id} step={t.step} done={self.done} score={self._score():.2f}"]
+        lines: List[str] = [f"task_id={t.scenario_id} step={t.step} done={self.done} score={self._get_safe_score():.2f}"]
         for p in t.pods:
             lines.append(f"pod {p.namespace}/{p.name} phase={p.phase} ready={p.ready} restarts={p.restarts} reason={p.reason}")
         if t.events:
@@ -485,7 +411,7 @@ class KubeSREGymEnv(Environment[KubeToolAction, KubeSREObservation, Dict[str, An
             step=self.step_n,
             done=self.done,
             reward=float(self.reward),
-            score=float(self._score()),
+            score=self._get_safe_score(),
             text=text,
             telemetry=self._telemetry(),
             metadata={"episode_id": self.episode_id},
