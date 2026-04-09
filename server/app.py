@@ -71,7 +71,7 @@ def main():
     """
     # Use 0.0.0.0 for Docker/HuggingFace, default to 127.0.0.1 for local dev
     host = os.environ.get("HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", "8001"))
+    port = int(os.environ.get("PORT", "8000"))
     
     # CRITICAL: The string path must be "server.app:app" to work as a package
     uvicorn.run("server.app:app", host=host, port=port, log_level="info")
