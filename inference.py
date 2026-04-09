@@ -46,7 +46,7 @@ def clean_json_response(raw_text: str) -> dict:
 
 async def solve_task(task_id: str):
     print(f"[START] {task_id}")
-    score = 0.0
+    score = 0.01
     
     # Use a high timeout because LLMs can be slow
     async with httpx.AsyncClient(timeout=30.0) as http:
@@ -84,9 +84,14 @@ async def solve_task(task_id: str):
                     step_data = step_res.json()
                     
                     # Extract variables based on standard OpenEnv schema
-                    state = step_data.get("observation", step_data)
-                    is_done = step_data.get("done", False)
-                    score = float(step_data.get("reward", 0.0))
+                state = step_data.get("observation", step_data)
+                is_done = step_data.get("done", False)
+
+                # CRITICAL FIX: Extract 'score' from the observation dictionary
+                if isinstance(state, dict):
+                    score = float(state.get("score", 0.01))
+                else:
+                    score = 0.01
                     
                     if is_done:
                         break
